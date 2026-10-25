@@ -1,42 +1,39 @@
-# np-trophy
+# PS3 Trophy Server
 
-OpenPak's independent PlayStation 3 trophy service. Owns native console trophy
-routes, discovery and persistent Postgres storage. Ticket validation rechecks
-current account/link ownership through the account core, including interaction
-policy when reading another user's trophies. np-account forwards the existing
-native paths here; no account or XMPP implementation runs in this process.
+OpenPak's PS3 Trophy Server.
 
-Two separate listeners:
+| | |
+| --- | --- |
+| Network | PlayStation 3 |
+| Role | Native PS3 trophy routes, discovery and persistent Postgres trophy storage |
+| Depends on | [`account`](https://github.com/openpak/account) (account core), [`np-common`](https://github.com/openpak/np-common) (vendored), PostgreSQL |
+| Used by | [`np-account`](https://github.com/openpak/np-account) |
+| Image | `ghcr.io/openpak/np-trophy` |
+| Licence | AGPL-3.0-only |
 
-- `NP_HTTP_ADDR=:8531`: native `/trophy/sec/*`,
-  `/np/resource/trophy/trophy-status.xml`, and `/healthz`.
-- `NP_TROPHY_ADDR=:8530`: existing bearer-authenticated private
-  `/v1/users/{core-uuid}/trophies` API and `/healthz`. Never publish this listener
-  through console routing.
+## What it serves
 
-Required: `NP_TROPHY_DATABASE_URL`, `NP_TROPHY_KEY` (at least 32 bytes),
-`NP_CORE_KEY` (at least 32 bytes), `NP_TICKET_KEY` (existing Ed25519 PKCS8 key),
-`NP_TROPHY_RESOURCE_KEY` (existing 20-byte firmware compatibility key).
-`NP_CORE_ADDR` defaults to `localhost:7000`. Optional `NP_TLS_ADDR`,
-`NP_TLS_CA_CERT`, `NP_TLS_CA_KEY` enable the firmware TLS front on native HTTP.
-No OAuth credentials or `NP_TOKEN_KEY` are needed.
+| Endpoint | What |
+| --- | --- |
+| `/trophy/sec/*`, `/np/resource/trophy/trophy-status.xml` | Native PS3 trophy routes and discovery (native HTTP listener, `:8531`) |
+| `/v1/users/{core-uuid}/trophies` | Private bearer-authenticated trophy API (separate listener, `:8530`, never published to consoles) |
+| `/healthz` | Health check on both listeners |
 
-The native handlers use local storage directly. Existing schema, first-unlock
-semantics, grade filling and private API contract remain unchanged. Reuse the
-existing database; no export/import or new identity database is needed.
-Discovery advertises maintenance on storage failure.
+## Run
 
 ```sh
 # Export values from example.env after supplying operator credentials.
 GOWORK=off go run -mod=vendor .
-GOWORK=off go test -mod=vendor ./...
-GOWORK=off go vet -mod=vendor ./...
-podman build -t np-trophy .
-# Runs database integration tests against an EMPTY scratch database:
-NP_TROPHY_TEST_DATABASE_URL=postgres://... GOWORK=off go test -mod=vendor ./...
 ```
 
-Shared np-common code is vendored; refresh using `GOWORK=off go mod vendor`
-with the sibling module present. Release tags publish `ghcr.io/openpak/np-trophy`.
-See [migration](https://github.com/openpak/np-account/blob/main/docs/service-split.md)
-and [wire provenance](docs/provenance.md). AGPL-3.0-only.
+## Docs
+
+- [Protocol](docs/protocol.md)
+- [Evidence](docs/evidence.md)
+- [Deploy](docs/deploy.md)
+- [Notes](docs/notes.md)
+- [Wire provenance](docs/provenance.md)
+
+## Licence
+
+AGPL-3.0-only. See [LICENSE](LICENSE).
