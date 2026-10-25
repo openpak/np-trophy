@@ -84,8 +84,8 @@ func TestTrophyAPI(t *testing.T) {
 	// A later sync keeps the first unlock time and fills only a missing grade.
 	code, games := call("POST", alice, bearer, set("NPWR02222_00", Unlock{ID: 0, EarnedAt: 999, Grade: "G"}, Unlock{ID: 7, EarnedAt: 700, Grade: "B"}))
 	want := []Game{
-		{"NPWR01111_00", []Unlock{{5, 50, "P"}}},
-		{"NPWR02222_00", []Unlock{{0, 100, "G"}, {3, 300, ""}, {7, 700, "B"}}},
+		{CommunicationID: "NPWR01111_00", Trophies: []Unlock{{ID: 5, EarnedAt: 50, Grade: "P"}}},
+		{CommunicationID: "NPWR02222_00", Trophies: []Unlock{{ID: 0, EarnedAt: 100, Grade: "G"}, {ID: 3, EarnedAt: 300}, {ID: 7, EarnedAt: 700, Grade: "B"}}},
 	}
 	if code != 200 || !equal(games, want) {
 		t.Fatalf("merged: %d %+v", code, games)

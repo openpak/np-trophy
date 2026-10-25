@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"openpak/np-trophy/native"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -9,17 +10,10 @@ import (
 
 // Unlock is one earned trophy. IDs are the firmware's zero-based trophy index, EarnedAt is
 // Unix seconds and Grade is "", "B", "S", "G" or "P".
-type Unlock struct {
-	ID       int    `json:"id"`
-	EarnedAt int64  `json:"earned_at"`
-	Grade    string `json:"grade"`
-}
+type Unlock = native.Unlock
 
-// Game is one trophy set (communication ID, e.g. NPWR01234_00) and its unlocks.
-type Game struct {
-	CommunicationID string   `json:"communication_id"`
-	Trophies        []Unlock `json:"trophies"`
-}
+// Game is the persisted native trophy set.
+type Game = native.TrophyGame
 
 type Store struct{ DB *pgxpool.Pool }
 

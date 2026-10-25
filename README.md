@@ -1,28 +1,42 @@
 # np-trophy
 
-OpenPak's PS3 trophy storage. A private API behind
-[np-account](https://github.com/openpak/np-account): np-account verifies the firmware's
-signed ticket, maps it to the OpenPak core account and calls this service with a bearer
-key. np-trophy never faces a console and is never published outside the server network.
+OpenPak's independent PlayStation 3 trophy service. Owns native console trophy
+routes, discovery and persistent Postgres storage. Ticket validation rechecks
+current account/link ownership through the account core, including interaction
+policy when reading another user's trophies. np-account forwards the existing
+native paths here; no account or XMPP implementation runs in this process.
 
-- `GET /healthz` — no auth.
-- `GET /v1/users/{core-uuid}/trophies` — every stored unlock: `{"games": [{"communication_id",
-  "trophies": [{"id", "earned_at", "grade"}]}]}`, by communication ID and trophy ID.
-- `POST` the same path with `{"communication_id": "NPWR01234_00", "trophies": [...]}` — merges,
-  then answers like `GET`. The first stored unlock of a trophy is kept (a later sync never moves
-  its time); a grade (`B`, `S`, `G`, `P`) only fills in where none was recorded.
+Two separate listeners:
 
-Bounds: canonical lower-case core UUIDs, 64 KiB body, 8 KiB headers, 1024 trophies per merge,
-trophy IDs 0-1023, 5 s timeouts.
+- `NP_HTTP_ADDR=:8531`: native `/trophy/sec/*`,
+  `/np/resource/trophy/trophy-status.xml`, and `/healthz`.
+- `NP_TROPHY_ADDR=:8530`: existing bearer-authenticated private
+  `/v1/users/{core-uuid}/trophies` API and `/healthz`. Never publish this listener
+  through console routing.
 
-Configuration: `NP_TROPHY_DATABASE_URL` (Postgres, required), `NP_TROPHY_KEY` (at least
-32 bytes, shared with np-account's `NP_TROPHY_BACKEND_KEY`), `NP_TROPHY_ADDR` (default `:8530`).
+Required: `NP_TROPHY_DATABASE_URL`, `NP_TROPHY_KEY` (at least 32 bytes),
+`NP_CORE_KEY` (at least 32 bytes), `NP_TICKET_KEY` (existing Ed25519 PKCS8 key),
+`NP_TROPHY_RESOURCE_KEY` (existing 20-byte firmware compatibility key).
+`NP_CORE_ADDR` defaults to `localhost:7000`. Optional `NP_TLS_ADDR`,
+`NP_TLS_CA_CERT`, `NP_TLS_CA_KEY` enable the firmware TLS front on native HTTP.
+No OAuth credentials or `NP_TOKEN_KEY` are needed.
 
-Test against an empty scratch database:
+The native handlers use local storage directly. Existing schema, first-unlock
+semantics, grade filling and private API contract remain unchanged. Reuse the
+existing database; no export/import or new identity database is needed.
+Discovery advertises maintenance on storage failure.
 
 ```sh
-NP_TROPHY_TEST_DATABASE_URL=postgres://... go test ./...
+# Export values from example.env after supplying operator credentials.
+GOWORK=off go run -mod=vendor .
+GOWORK=off go test -mod=vendor ./...
+GOWORK=off go vet -mod=vendor ./...
+podman build -t np-trophy .
+# Runs database integration tests against an EMPTY scratch database:
+NP_TROPHY_TEST_DATABASE_URL=postgres://... GOWORK=off go test -mod=vendor ./...
 ```
 
-Replaces the earlier RPCN-fork trophy facade with the same HTTP contract. Tag `v*.*.*` publishes
-`ghcr.io/openpak/np-trophy` for amd64 and arm64. AGPL-3.0-only.
+Shared np-common code is vendored; refresh using `GOWORK=off go mod vendor`
+with the sibling module present. Release tags publish `ghcr.io/openpak/np-trophy`.
+See [migration](https://github.com/openpak/np-account/blob/main/docs/service-split.md)
+and [wire provenance](docs/provenance.md). AGPL-3.0-only.
