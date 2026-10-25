@@ -17,6 +17,9 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 )
 
-require openpak/np-common v0.0.0
+require (
+	github.com/openpak/account-api v0.1.0
+	openpak/np-common v0.0.0
+)
 
 replace openpak/np-common => ../np-common

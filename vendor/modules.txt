@@ -22,6 +22,9 @@ github.com/jackc/pgx/v5/pgxpool
 ## explicit; go 1.19
 github.com/jackc/puddle/v2
 github.com/jackc/puddle/v2/internal/genstack
+# github.com/openpak/account-api v0.1.0
+## explicit; go 1.26.0
+github.com/openpak/account-api/openpak/account/v1
 # golang.org/x/net v0.58.0
 ## explicit; go 1.25.0
 golang.org/x/net/http/httpguts
@@ -161,7 +164,6 @@ google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/timestamppb
 # openpak/np-common v0.0.0 => ../np-common
 ## explicit; go 1.26.0
-openpak/np-common/accountpb
 openpak/np-common/coreclient
 openpak/np-common/events
 openpak/np-common/fakecore
