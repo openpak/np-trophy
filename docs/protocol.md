@@ -13,3 +13,7 @@ Two separate listeners:
 - `NP_TROPHY_ADDR=:8530`: existing bearer-authenticated private
   `/v1/users/{core-uuid}/trophies` API and `/healthz`. Never publish this listener
   through console routing.
+
+## Semantics
+
+Schema, first-unlock semantics, grade filling and the private API contract are unchanged from the original np-account implementation.

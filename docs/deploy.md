@@ -21,3 +21,7 @@ Shared np-common code is vendored; refresh using `GOWORK=off go mod vendor`
 with the sibling module present. Release tags publish `ghcr.io/openpak/np-trophy`.
 See [migration](https://github.com/openpak/np-account/blob/main/docs/service-split.md)
 and [wire provenance](provenance.md). AGPL-3.0-only.
+
+## Storage
+
+The native handlers use local storage directly. Reuse the existing database; no export/import or new identity database is needed. Discovery advertises maintenance on storage failure.
