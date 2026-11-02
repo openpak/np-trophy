@@ -1,6 +1,10 @@
 # Changelog: np-trophy
 
-## Unreleased
+## v0.2.1 — 2026-11-02
+
+- Uses github.com/openpak/account-api instead of a vendored accountpb copy; docs trimmed to README, protocol and deploy.
+
+## v0.2.0 — 2026-10-25
 
 - Split PS3 account, community/XMPP and native trophies into independent services; share protocol primitives through vendored np-common.
 
