@@ -1,5 +1,11 @@
 # Changelog: np-trophy
 
+## v0.3.1 — 2026-11-03
+
+- Every request logs one stderr line, `http <method> <path> -> <status> <duration>ms` (np-common v0.1.2 `httplog`,
+  through `nphttp.Logging`): no query, headers, credentials or bodies; `/healthz` skipped; the PS3 status header is
+  appended as `ps3_status=<n>` when set. Replaces the slog "NP HTTP" line, which had no duration.
+
 ## v0.3.0 — 2026-11-03
 
 - Trophies are stored in the neutral achievements core (board #59): `store.go` and the Postgres
