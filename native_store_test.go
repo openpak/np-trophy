@@ -8,38 +8,28 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	accountv1 "github.com/openpak/account-api/openpak/account/v1"
 	"openpak/np-common/coreclient"
 	"openpak/np-common/fakecore"
 	"openpak/np-common/identity"
 	"openpak/np-common/ticket"
+	"openpak/np-trophy/internal/fakeachievements"
 	"openpak/np-trophy/native"
 )
 
-func TestNativeTrophyUsesPersistentStoreAndIsolatedListener(t *testing.T) {
-	dbURL := os.Getenv("NP_TROPHY_TEST_DATABASE_URL")
-	if dbURL == "" {
-		t.Skip("NP_TROPHY_TEST_DATABASE_URL not set")
-	}
+func TestNativeTrophyUsesAchievementsAndIsolatedListener(t *testing.T) {
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, dbURL)
+	const achKey = "ach-key-0123456789abcdef0123456789abcdef"
+	ach := fakeachievements.New(achKey)
+	store, achConn, err := DialAchievements("passthrough:///ach", achKey, ach.Serve(t)...)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer pool.Close()
-	store := &Store{DB: pool}
-	if err = store.Migrate(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = pool.Exec(ctx, "TRUNCATE trophy_unlocks"); err != nil {
-		t.Fatal(err)
-	}
+	defer achConn.Close()
 	const coreKey = "test-core-key-at-least-thirty-two-bytes"
 	const account = "0b7c3f4e-1d2a-4c5b-9e8f-112233445566"
 	fake := fakecore.New(coreKey)
@@ -89,8 +79,8 @@ func TestNativeTrophyUsesPersistentStoreAndIsolatedListener(t *testing.T) {
 	if code := post(body); code != 200 {
 		t.Fatalf("native sync: %d", code)
 	}
-	// A second instance sees the same existing schema, not process-local state.
-	games, err := (&Store{DB: pool}).Games(ctx, account)
+	// The trophy lands in the achievements service, not in process-local state.
+	games, err := store.Games(ctx, account)
 	if err != nil || len(games) != 1 || len(games[0].Trophies) != 1 || games[0].Trophies[0].ID != 0 || games[0].Trophies[0].Grade != "B" {
 		t.Fatalf("persisted native sync: %+v, %v", games, err)
 	}

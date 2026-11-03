@@ -1,0 +1,193 @@
+syntax = "proto3";
+
+package openpak.achievements.v1;
+
+option go_package = "openpak/np-trophy/internal/achievementspb;achievementspb";
+
+// The neutral achievements store (trophies, Xbox achievements, Switch badges). A title key is the
+// same on every network (title_keys maps (network, native id) to it: a PS3/PS4/PS5 NPWR id, an
+// Xbox title id, a Switch application id). Map several native ids to one title only when they share
+// one achievement set (PS4 and PS5 builds of a cross-gen game); sets that differ get their own key.
+//
+// Every request names the caller's network (the account-core link namespace: np, x360, xbox,
+// switch) and the title as that network knows it. Accounts are core account ids. Catalogues are
+// stored only as uploaded: the consoles own them (TROPCONF, XDBF, title packages) and the service
+// never invents a name. Unlocks work without a catalogue.
+service Achievements {
+  // Store what a console uploaded about a set: groups and achievements. Never deletes.
+  rpc UpsertCatalogue(UpsertCatalogueRequest) returns (UpsertCatalogueResponse);
+  // Read the stored catalogue of a title.
+  rpc GetCatalogue(GetCatalogueRequest) returns (GetCatalogueResponse);
+  // Record unlocks and progress for one account in one title. Idempotent: the first recorded
+  // unlock time wins and never moves, progress only grows, a missing grade or group fills in.
+  rpc Unlock(UnlockRequest) returns (UnlockResponse);
+  // Unlocks of an account in one title, or in every title the caller's network knows.
+  rpc ListUnlocks(ListUnlocksRequest) returns (ListUnlocksResponse);
+  // Totals for one title, per group (DLC groups), with points.
+  rpc GetProgress(GetProgressRequest) returns (GetProgressResponse);
+  // Titles an account has played or earned something in, with totals.
+  rpc ListTitles(ListTitlesRequest) returns (ListTitlesResponse);
+  // Note that a title was played without an unlock (x360 title history sync).
+  rpc RecordTitle(RecordTitleRequest) returns (RecordTitleResponse);
+  // Operator: join a native id to a neutral title key, name a title, set its visibility.
+  rpc MapTitle(MapTitleRequest) returns (MapTitleResponse);
+}
+
+message TitleRef {
+  string network = 1; // caller's link namespace; empty means `title` is already the neutral key
+  string title = 2;   // title as the network knows it
+}
+
+message Group {
+  string id = 1; // "default" is the base game; DLC groups use their own ids
+  string name = 2;
+  string description = 3;
+  string image = 4;
+}
+
+message Item {
+  string id = 1; // achievement id within the title, a string (PS trophy index, Xbox achievement id)
+  string group_id = 2; // empty = "default"
+  string kind = 3;     // "achievement" (default) or "avatar_award"
+  string name = 4;
+  string description = 5;
+  string grade = 6;    // bronze|silver|gold|platinum (B S G P accepted), or empty
+  optional uint32 points = 7; // gamerscore or neutral points; unset keeps the stored value
+  optional bool hidden = 8;
+  string image = 9;    // opaque image ref exactly as the console uploaded it
+  optional uint32 progress_target = 10; // progress trophies: the count that unlocks it
+  uint32 position = 11; // display order; 0 = by id
+}
+
+message UpsertCatalogueRequest {
+  TitleRef ref = 1;
+  string title_name = 2;
+  repeated Group groups = 3;
+  repeated Item items = 4;
+}
+message UpsertCatalogueResponse {
+  string title = 1;
+  uint32 items = 2;
+}
+
+message GetCatalogueRequest {
+  TitleRef ref = 1;
+  string group_id = 2; // optional filter
+  bool include_hidden = 3; // hidden items are returned without name/description unless set
+}
+message GetCatalogueResponse {
+  string title = 1;
+  string title_name = 2;
+  repeated Group groups = 3;
+  repeated Item items = 4;
+}
+
+message UnlockItem {
+  string achievement_id = 1;
+  int64 unlocked_unix = 2; // 0 = not unlocked (progress only); otherwise the console's own time
+  uint32 progress = 3;     // percent 0..100 (100 with an unlock time)
+  string grade = 4;        // used when the catalogue has none
+  string group_id = 5;     // used when the catalogue has none
+}
+
+message UnlockRequest {
+  TitleRef ref = 1;
+  string account = 2;
+  repeated UnlockItem unlocks = 3;
+}
+
+message Unlocked {
+  string achievement_id = 1;
+  string group_id = 2;
+  int64 unlocked_unix = 3; // 0 when only progress is recorded
+  uint32 progress = 4;
+  string grade = 5;
+  string network = 6; // network that first recorded it
+  bool newly_unlocked = 7; // response of Unlock only: this call stored the unlock
+}
+message UnlockResponse {
+  string title = 1;
+  repeated Unlocked results = 2;
+}
+
+message ListUnlocksRequest {
+  TitleRef ref = 1; // title empty with a network: every title mapped on that network
+  string account = 2;
+  string group_id = 3;
+  bool include_progress = 4; // also rows with progress but no unlock yet
+}
+message TitleUnlocks {
+  string title = 1;      // neutral key
+  string native_id = 2;  // the caller network's id of the title (lowest when several); empty if none
+  repeated Unlocked unlocks = 3;
+}
+message ListUnlocksResponse {
+  repeated TitleUnlocks titles = 1;
+}
+
+message GetProgressRequest {
+  TitleRef ref = 1;
+  string account = 2;
+}
+message GroupProgress {
+  string group_id = 1;
+  string name = 2;
+  uint32 total = 3;     // catalogue items in the group
+  uint32 unlocked = 4;
+  uint32 points_total = 5;
+  uint32 points_earned = 6;
+  uint32 percent = 7;   // unlocked/total (0 without a catalogue)
+}
+message GetProgressResponse {
+  string title = 1;
+  string title_name = 2;
+  uint32 total = 3;
+  uint32 unlocked = 4;
+  uint32 points_total = 5;
+  uint32 points_earned = 6;
+  uint32 percent = 7;
+  uint32 in_progress = 8; // rows with partial progress
+  repeated GroupProgress groups = 9;
+  map<string, uint32> grades = 10; // earned count per grade
+}
+
+message ListTitlesRequest {
+  string account = 1;
+  string network = 2; // caller's network; titles that opted out of cross-network show only own rows
+}
+message TitleSummary {
+  string title = 1;
+  string title_name = 2;
+  string native_id = 3; // caller network's id when mapped
+  int64 first_seen_unix = 4;
+  int64 last_played_unix = 5;
+  repeated string networks = 6; // networks the account played it on
+  uint32 unlocked = 7;
+  uint32 total = 8;
+  uint32 points_earned = 9;
+  uint32 points_total = 10;
+}
+message ListTitlesResponse {
+  repeated TitleSummary titles = 1;
+}
+
+message RecordTitleRequest {
+  TitleRef ref = 1;
+  string account = 2;
+  string title_name = 3;
+  int64 played_unix = 4; // 0 = now
+}
+message RecordTitleResponse {
+  string title = 1;
+}
+
+message MapTitleRequest {
+  string title = 1;   // neutral key
+  string name = 2;
+  string network = 3;
+  string native_id = 4;
+  optional bool cross_network = 5; // unset keeps the stored value (default true)
+}
+message MapTitleResponse {
+  string title = 1;
+}

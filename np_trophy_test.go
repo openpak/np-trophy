@@ -8,30 +8,24 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"openpak/np-trophy/internal/fakeachievements"
 )
 
-// One end-to-end test over HTTP and real Postgres (NP_TROPHY_TEST_DATABASE_URL, an empty
-// scratch database): auth, validation, merge semantics, ordering and account isolation.
+// One end-to-end test over HTTP and a fake achievements server: auth, validation, merge semantics
+// (the fake mirrors the core's first-recorded-wins rule), ordering and account isolation. The real
+// rule is tested in the achievements repo.
 func TestTrophyAPI(t *testing.T) {
-	dbURL := os.Getenv("NP_TROPHY_TEST_DATABASE_URL")
-	if dbURL == "" {
-		t.Skip("NP_TROPHY_TEST_DATABASE_URL not set")
-	}
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, dbURL)
+	const achKey = "ach-key-0123456789abcdef0123456789abcdef"
+	fake := fakeachievements.New(achKey)
+	store, conn, err := DialAchievements("passthrough:///ach", achKey, fake.Serve(t)...)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer pool.Close()
-	store := &Store{DB: pool}
-	if err := store.Migrate(ctx); err != nil {
-		t.Fatal(err)
-	}
-	pool.Exec(ctx, "TRUNCATE trophy_unlocks")
+	defer conn.Close()
+	_ = ctx
 	key := "k-0123456789abcdef0123456789abcdef"
 	srv := httptest.NewServer(Handler(store, key, slog.New(slog.NewTextHandler(io.Discard, nil))))
 	defer srv.Close()
@@ -93,6 +87,18 @@ func TestTrophyAPI(t *testing.T) {
 	call("POST", alice, bearer, set("NPWR02222_00", Unlock{ID: 0, EarnedAt: 1, Grade: "B"}))
 	if _, games = call("GET", alice, bearer, nil); !equal(games, want) {
 		t.Fatalf("first unlock and grade must stick: %+v", games)
+	}
+	// A wrong service key fails closed: the private API answers 500, never empty.
+	bad, _, _ := DialAchievements("passthrough:///ach", "wrong-key-0123456789abcdef0123456789", fake.Serve(t)...)
+	badSrv := httptest.NewServer(Handler(bad, key, slog.New(slog.NewTextHandler(io.Discard, nil))))
+	defer badSrv.Close()
+	if req, _ := http.NewRequest("GET", badSrv.URL+"/v1/users/"+alice+"/trophies", nil); true {
+		req.Header.Set("Authorization", bearer)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil || resp.StatusCode != 500 {
+			t.Fatalf("unreachable store: %v %v", err, resp)
+		}
+		resp.Body.Close()
 	}
 	if _, games = call("GET", bob, bearer, nil); len(games) != 0 {
 		t.Fatalf("accounts must not share unlocks: %+v", games)

@@ -17,8 +17,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -29,10 +27,11 @@ func main() {
 }
 func run() error {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	dbURL, key := os.Getenv("NP_TROPHY_DATABASE_URL"), os.Getenv("NP_TROPHY_KEY")
-	if dbURL == "" || len(key) < 32 {
-		log.Error("NP_TROPHY_DATABASE_URL and NP_TROPHY_KEY (>= 32 bytes) must be set")
-		return fmt.Errorf("NP_TROPHY_DATABASE_URL and NP_TROPHY_KEY (>= 32 bytes) must be set")
+	key := os.Getenv("NP_TROPHY_KEY")
+	achAddr, achKey := os.Getenv("NP_ACHIEVEMENTS_ADDR"), os.Getenv("NP_ACHIEVEMENTS_KEY")
+	if achAddr == "" || len(achKey) < 32 || len(key) < 32 {
+		log.Error("NP_ACHIEVEMENTS_ADDR, NP_ACHIEVEMENTS_KEY (>= 32 bytes) and NP_TROPHY_KEY (>= 32 bytes) must be set")
+		return fmt.Errorf("NP_ACHIEVEMENTS_ADDR, NP_ACHIEVEMENTS_KEY (>= 32 bytes) and NP_TROPHY_KEY (>= 32 bytes) must be set")
 	}
 	addr := os.Getenv("NP_TROPHY_ADDR")
 	if addr == "" {
@@ -40,17 +39,12 @@ func run() error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	pool, err := pgxpool.New(ctx, dbURL)
+	store, achConn, err := DialAchievements(achAddr, achKey)
 	if err != nil {
-		log.Error("database", "err", err)
+		log.Error("achievements", "err", err)
 		return err
 	}
-	defer pool.Close()
-	store := &Store{DB: pool}
-	if err := store.Migrate(ctx); err != nil {
-		log.Error("migrate", "err", err)
-		return err
-	}
+	defer achConn.Close()
 	if len(os.Getenv("NP_CORE_KEY")) < 32 {
 		return fmt.Errorf("NP_CORE_KEY must be at least 32 bytes")
 	}

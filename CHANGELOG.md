@@ -1,5 +1,12 @@
 # Changelog: np-trophy
 
+## v0.3.0 — 2026-11-03
+
+- Trophies are stored in the neutral achievements core (board #59): `store.go` and the Postgres
+  dependency are gone, replaced by a gRPC client (`internal/achievementspb`, `NP_ACHIEVEMENTS_ADDR`
+  and `NP_ACHIEVEMENTS_KEY`). The PS3 wire, the private API and the first-recorded-unlock-wins
+  rule are unchanged; the core enforces the rule. `NP_TROPHY_DATABASE_URL` is no longer read.
+
 ## v0.2.1 — 2026-11-02
 
 - Uses github.com/openpak/account-api instead of a vendored accountpb copy; docs trimmed to README, protocol and deploy.

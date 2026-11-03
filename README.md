@@ -5,8 +5,8 @@ OpenPak's PS3 Trophy Server.
 | | |
 | --- | --- |
 | Network | PlayStation 3 |
-| Role | Native PS3 trophy routes, discovery and persistent Postgres trophy storage |
-| Depends on | [`account`](https://github.com/openpak/account) (account core), [`np-common`](https://github.com/openpak/np-common) (vendored), PostgreSQL |
+| Role | Native PS3 trophy routes, discovery and the private trophy API; trophies are stored in the achievements core |
+| Depends on | [`account`](https://github.com/openpak/account) (account core), [`np-common`](https://github.com/openpak/np-common) (vendored), [`achievements`](https://github.com/openpak/achievements) (trophy storage, gRPC) |
 | Used by | [`np-account`](https://github.com/openpak/np-account) |
 | Image | `ghcr.io/openpak/np-trophy` |
 | Licence | AGPL-3.0-only |
